@@ -1,6 +1,7 @@
 package com.slash.batterychargelimit
 
 import androidx.annotation.Keep
+import eu.chainfire.libsuperuser.Shell
 
 /**
  * Created by Michael on 31.03.2017.
@@ -34,10 +35,10 @@ class ControlFile {
     fun validate() {
         val suShell = Utils.suShell
         if (!checked) {
-            suShell.addCommand("test -e " + file!!, 0) { _, exitCode, _ ->
+            suShell.addCommand("test -e " + file!!, 0, Shell.OnCommandResultListener { _, exitCode, _ ->
                 valid = 0 == exitCode
                 checked = true
-            }
+            })
         }
     }
 
