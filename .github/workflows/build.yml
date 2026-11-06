@@ -11,12 +11,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # JDK 17 only for the Android SDK setup
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      # Switch to JDK 8 for the old Gradle build
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 8
-
-      - uses: android-actions/setup-android@v3
 
       - name: Build debug APK
         run: |
