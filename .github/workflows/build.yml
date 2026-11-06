@@ -18,6 +18,9 @@ jobs:
           java-version: 17
 
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
 
       # Switch to JDK 8 for the old Gradle build
       - uses: actions/setup-java@v4
