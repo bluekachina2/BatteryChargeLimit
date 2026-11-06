@@ -97,12 +97,12 @@ object Utils {
         if (alwaysWrite) {
             suShell.addCommand(switchCommands)
         } else {
-            suShell.addCommand("cat $file", 0) { _, _, output ->
+            suShell.addCommand("cat $file", 0, Shell.OnCommandResultListener { _, _, output ->
                 if (output.size == 0 || output[0] != newState) {
                     setChangePending()
                     suShell.addCommand(switchCommands)
                 }
-            }
+            })
         }
     }
 
@@ -185,13 +185,13 @@ object Utils {
 //        } catch (e: Exception) {
 //            Log.i("New reset method failed", e.message, e)
             // on Exception, fall back to conventional method
-            suShell.addCommand("dumpsys batterystats --reset", 0) { _, exitCode, _ ->
+            suShell.addCommand("dumpsys batterystats --reset", 0, Shell.OnCommandResultListener { _, exitCode, _ ->
                 if (exitCode == 0) {
                     Toast.makeText(context, R.string.stats_reset_success, Toast.LENGTH_SHORT).show()
                 } else {
                     Log.e(TAG, "Statistics reset failed")
                 }
-            }
+            })
 //        }
     }
 
@@ -365,7 +365,7 @@ object Utils {
     fun getCurrentVoltageThresholdAsync(context: Context, handler: Handler?){
         executor.submit {
             val voltageFile = getVoltageFile()
-            suShell.addCommand("cat $voltageFile", 0) { _, _, output ->
+            suShell.addCommand("cat $voltageFile", 0, Shell.OnCommandResultListener { _, _, output ->
                 if (output.size != 0 ) {
                     val voltage = output[0]
                     val sharedPrefs = getSettings(context)
@@ -380,7 +380,7 @@ object Utils {
                         handler.sendMessage(msg)
                     }
                 }
-            }
+            })
         }
     }
 
