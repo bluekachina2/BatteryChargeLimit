@@ -28,6 +28,11 @@ jobs:
           distribution: temurin
           java-version: 8
 
+      - name: Create dummy keystore.properties (debug build only)
+        run: |
+          mkdir -p private
+          printf 'storeFile=dummy.jks\nstorePassword=dummy\nkeyAlias=dummy\nkeyPassword=dummy\n' > private/keystore.properties
+
       - name: Build debug APK
         run: |
           chmod +x ./gradlew
