@@ -195,5 +195,29 @@
     "chargeOn": "0",
     "chargeOff": "1",
     "experimental": true
+  },
+  {
+    "file": "/sys/class/power_supply/mmi_battery/device/force_chg_usb_suspend",
+    "label": "mmi force_chg_usb_suspend",
+    "details": "Motorola edge 50 pro (UNVERIFIED: factory-test node, suspends USB input)",
+    "chargeOn": "0",
+    "chargeOff": "1",
+    "experimental": true
+  },
+  {
+    "file": "/sys/class/power_supply/battery/device/force_chg_usb_suspend",
+    "label": "battery force_chg_usb_suspend",
+    "details": "Motorola (UNVERIFIED: factory-test node, suspends USB input)",
+    "chargeOn": "0",
+    "chargeOff": "1",
+    "experimental": true
+  },
+  {
+    "file": "/sys/module/qpnp_adaptive_charge/parameters/upper_limit",
+    "label": "qpnp_adaptive_charge upper_limit",
+    "details": "Motorola edge 50 pro (UNVERIFIED: writes the limit %, turn off Moto adaptive charging)",
+    "chargeOn": "-1",
+    "chargeOff": "{limit}",
+    "experimental": true
   }
 ]

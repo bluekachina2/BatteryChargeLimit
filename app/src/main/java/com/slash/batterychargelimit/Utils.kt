@@ -75,11 +75,15 @@ object Utils {
         val alwaysWrite = preferences.getBoolean(PrefsFragment.KEY_ALWAYS_WRITE_CF, false)
 
         val file = getCtrlFileData(context)
-        val newState = if (chargeMode == CHARGE_ON) {
+        val rawState = if (chargeMode == CHARGE_ON) {
             getCtrlEnabledData(context)
         } else {
             getCtrlDisabledData(context)
         }
+        // Allow control files that take a percentage (e.g. Motorola qpnp_adaptive_charge/upper_limit):
+        // "{limit}" is replaced by the currently configured charge limit.
+        val newState = rawState.replace("{limit}",
+                getSettings(context).getInt(LIMIT, Constants.DEFAULT_LIMIT_PC).toString())
 
         val switchCommands: Array<String>
         if (cfInitialized) {

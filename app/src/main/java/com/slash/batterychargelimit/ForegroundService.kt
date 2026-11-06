@@ -1,10 +1,13 @@
 package com.slash.batterychargelimit
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.RingtoneManager
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -30,7 +33,7 @@ class ForegroundService : Service() {
 
     private val settings by lazy(LazyThreadSafetyMode.NONE) {this.getSharedPreferences(SETTINGS, 0)}
     private val prefs by lazy(LazyThreadSafetyMode.NONE) {Utils.getPrefs(this)}
-    private val mNotifyBuilder by lazy(LazyThreadSafetyMode.NONE) { NotificationCompat.Builder(this, "Charge Limit State") }
+    private val mNotifyBuilder by lazy(LazyThreadSafetyMode.NONE) { NotificationCompat.Builder(this, CHANNEL_ID) }
     private var notifyID = 1
     private var autoResetActive = false
     private var batteryReceiver: BatteryReceiver? = null
@@ -47,6 +50,15 @@ class ForegroundService : Service() {
 
         notifyID = 1
         settings.edit().putBoolean(NOTIFICATION_LIVE, true).apply()
+
+        // Android 8+ requires a notification channel, otherwise startForeground() fails.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nm = getSystemService(NotificationManager::class.java)
+            if (nm.getNotificationChannel(CHANNEL_ID) == null) {
+                nm.createNotificationChannel(NotificationChannel(
+                        CHANNEL_ID, "Charge limit state", NotificationManager.IMPORTANCE_LOW))
+            }
+        }
 
         val notification = mNotifyBuilder
                 .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -133,6 +145,8 @@ class ForegroundService : Service() {
     }
 
     companion object {
+        private const val CHANNEL_ID = "Charge Limit State"
+
         /**
          * Returns whether the service is running right now
          *
