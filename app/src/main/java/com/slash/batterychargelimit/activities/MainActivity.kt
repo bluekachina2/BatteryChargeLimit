@@ -252,11 +252,13 @@ class MainActivity : AppCompatActivity() {
             if (!ForegroundService.isRunning) {
                 Utils.startServiceIfLimitEnabled(this)
             }
+            setStatusCTRLFileData()
         }
 
         minPicker.setOnValueChangedListener { _, _, min ->
             settings.edit().putInt(MIN, min).apply()
             updateMinText(min)
+            setStatusCTRLFileData()
         }
         resetBatteryStatsButton.setOnClickListener { Utils.resetBatteryStats(this@MainActivity) }
 //        autoResetSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -288,6 +290,7 @@ class MainActivity : AppCompatActivity() {
                         Utils.stopService(context)
                         enableSwitches(listOf(disableChargeSwitch, limitByVoltageSwitch))
                     }
+                    setStatusCTRLFileData()
                     EnableWidgetIntentReceiver.updateWidget(context, isChecked)
                 }
                 R.id.disable_charge_switch -> {
@@ -470,11 +473,21 @@ class MainActivity : AppCompatActivity() {
 
     fun setStatusCTRLFileData() {
         val statusCTRLData = findViewById<TextView>(R.id.status_ctrl_data)
-        statusCTRLData.text = String.format("%s, %s, %s",
-                Utils.getCtrlFileData(this),
-                Utils.getCtrlEnabledData(this),
-                Utils.getCtrlDisabledData(this)
-        )
+        val controlFile = Utils.getCtrlFileData(this)
+        if (controlFile == "/sys/module/qpnp_adaptive_charge/parameters/upper_limit") {
+            // For Motorola adaptive charging, show the live values selected in the
+            // app rather than the static control-file defaults from control_files.json.
+            val enabled = settings.getBoolean(CHARGE_LIMIT_ENABLED, false)
+            val upperLimit = if (enabled) settings.getInt(LIMIT, Constants.DEFAULT_LIMIT_PC).toString() else "-1"
+            val lowerLimit = if (enabled) settings.getInt(MIN, (settings.getInt(LIMIT, Constants.DEFAULT_LIMIT_PC) - 2).coerceAtLeast(0)).toString() else "-1"
+            statusCTRLData.text = "$controlFile, $upperLimit, $lowerLimit"
+        } else {
+            statusCTRLData.text = String.format("%s, %s, %s",
+                    controlFile,
+                    Utils.getCtrlEnabledData(this),
+                    Utils.getCtrlDisabledData(this)
+            )
+        }
     }
 
     companion object {
