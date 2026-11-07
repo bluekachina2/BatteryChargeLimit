@@ -41,6 +41,7 @@ object Utils {
     const val CHARGE_ON = 0
     const val CHARGE_OFF = 1
     private const val MOTOROLA_UPPER_LIMIT_FILE = "/sys/module/qpnp_adaptive_charge/parameters/upper_limit"
+    private const val MOTOROLA_LOWER_LIMIT_FILE = "/sys/module/qpnp_adaptive_charge/parameters/lower_limit"
 
     // remember pending state change
     private var changePending: Long = 0
@@ -80,24 +81,37 @@ object Utils {
 
         val file = getCtrlFileData(context)
         val isMotorolaAdaptiveCharge = file == MOTOROLA_UPPER_LIMIT_FILE
-        // Motorola's driver uses -1 to disable its limit and a percentage as
-        // the automatic upper threshold. Keep lower_limit=-1 (automatic mode).
-        val newState = if (isMotorolaAdaptiveCharge) {
-            if (chargeMode == CHARGE_ON) {
-                "-1"
-            } else {
-                getSettings(context).getInt(LIMIT, Constants.DEFAULT_LIMIT_PC).toString()
-            }
-        } else if (chargeMode == CHARGE_ON) {
+        val motorolaEnabled = getSettings(context).getBoolean(CHARGE_LIMIT_ENABLED, false)
+        val motorolaLimitCommands = if (motorolaEnabled) {
+            val limit = getSettings(context).getInt(LIMIT, Constants.DEFAULT_LIMIT_PC)
+            val recharge = getSettings(context).getInt(MIN, (limit - 2).coerceAtLeast(0))
+            // Set upper first (the driver validates lower against upper), then
+            // lower to enable the driver's hysteresis/recharge threshold.
+            arrayOf(
+                "echo \\"$limit\\" > $MOTOROLA_UPPER_LIMIT_FILE",
+                "echo \\"$recharge\\" > $MOTOROLA_LOWER_LIMIT_FILE"
+            )
+        } else {
+            // Clear lower first, then upper: the driver's upper setter otherwise
+            // forces 100 when a non-default lower threshold is still configured.
+            arrayOf(
+                "echo \\"-1\\" > $MOTOROLA_LOWER_LIMIT_FILE",
+                "echo \\"-1\\" > $MOTOROLA_UPPER_LIMIT_FILE"
+            )
+        }
+        val newState = if (isMotorolaAdaptiveCharge) null else if (chargeMode == CHARGE_ON) {
             getCtrlEnabledData(context)
         } else {
             getCtrlDisabledData(context)
         }
 
-        // Kernel module parameters are not mount points; root can write them
-        // directly without remounting or changing permissions.
+        // Motorola module parameters are writable sysfs attributes, not mount
+        // points. Apply both thresholds together; CHARGE_ON/OFF events must not
+        // toggle this driver's independent threshold mechanism on and off.
         val switchCommands: Array<String>
-        if (isMotorolaAdaptiveCharge || cfInitialized) {
+        if (isMotorolaAdaptiveCharge) {
+            switchCommands = motorolaLimitCommands
+        } else if (cfInitialized) {
             switchCommands = arrayOf("echo \\"$newState\\" > $file")
         } else {
             cfInitialized = true
