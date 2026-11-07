@@ -40,7 +40,7 @@
             android:windowSoftInputMode="stateAlwaysHidden"
             android:theme="@style/AppThemeLight.NoActionBar"/>
 
-        <receiver android:name=".receivers.BootReceiver">
+        <receiver android:name=".receivers.BootReceiver" android:enabled="true" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
@@ -82,7 +82,7 @@
             </intent-filter>
         </receiver>
 
-        <service android:name=".ForegroundService" />
+        <service android:name=".ForegroundService" android:enabled="true" android:exported="false" />
 
     </application>
 </manifest>
