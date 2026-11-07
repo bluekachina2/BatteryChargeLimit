@@ -356,8 +356,20 @@ class MainActivity : AppCompatActivity() {
                         statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.orange))
                     }
                     BatteryManager.BATTERY_STATUS_FULL -> {
-                        statusText.setText(R.string.full)
-                        statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.darkGreen))
+                        // Some devices (including Motorola's adaptive-charge driver)
+                        // report FULL at 100% even while the configured charge ceiling
+                        // is actively blocking further charging. Reflect the charge-limit
+                        // state in the UI instead of showing FULL in green.
+                        val batteryLevel = Utils.getBatteryLevel(intent)
+                        val limitEnabled = settings.getBoolean(CHARGE_LIMIT_ENABLED, false)
+                        val chargeLimit = settings.getInt(LIMIT, Constants.DEFAULT_LIMIT_PC)
+                        if (limitEnabled && batteryLevel >= chargeLimit) {
+                            statusText.setText(R.string.not_charging)
+                            statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.orange))
+                        } else {
+                            statusText.setText(R.string.full)
+                            statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.darkGreen))
+                        }
                     }
                     BatteryManager.BATTERY_STATUS_NOT_CHARGING -> {
                         statusText.setText(R.string.not_charging)
