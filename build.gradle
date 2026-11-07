@@ -20,6 +20,8 @@ allprojects {
         google()
         // libsuperuser is published in the SciJava public Maven repository.
         maven { url 'https://maven.scijava.org/content/repositories/public/' }
+        // Public mirror containing a fixed libsuperuser release for reliable CI resolution.
+        maven { url 'https://artifactory.appodeal.com/appodeal-public/' }
         jcenter()
     }
 }
