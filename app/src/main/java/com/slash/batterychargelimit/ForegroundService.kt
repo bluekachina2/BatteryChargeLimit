@@ -1,10 +1,13 @@
 package com.slash.batterychargelimit
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.RingtoneManager
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -31,7 +34,7 @@ class ForegroundService : Service() {
 
     private val settings by lazy(LazyThreadSafetyMode.NONE) {this.getSharedPreferences(SETTINGS, 0)}
     private val prefs by lazy(LazyThreadSafetyMode.NONE) {Utils.getPrefs(this)}
-    private val mNotifyBuilder by lazy(LazyThreadSafetyMode.NONE) { NotificationCompat.Builder(this, "Charge Limit State") }
+    private val mNotifyBuilder by lazy(LazyThreadSafetyMode.NONE) { NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID) }
     private var notifyID = 1
     private var autoResetActive = false
     private var batteryReceiver: BatteryReceiver? = null
@@ -43,7 +46,28 @@ class ForegroundService : Service() {
         autoResetActive = true
     }
 
+    private fun ensureNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = getSystemService(NotificationManager::class.java)
+            if (manager.getNotificationChannel(NOTIFICATION_CHANNEL_ID) == null) {
+                val channel = NotificationChannel(
+                    NOTIFICATION_CHANNEL_ID,
+                    getString(R.string.app_name),
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = getString(R.string.please_wait)
+                    setShowBadge(false)
+                }
+                manager.createNotificationChannel(channel)
+                Log.i(TAG, "Created foreground notification channel: $NOTIFICATION_CHANNEL_ID")
+            }
+        }
+    }
+
     override fun onCreate() {
+        super.onCreate()
+        ensureNotificationChannel()
+
         isRunning = true
         Utils.onForegroundServiceCreated()
         Log.i(TAG, "Foreground service created; entering foreground state")
@@ -139,16 +163,17 @@ class ForegroundService : Service() {
 
     companion object {
         private const val TAG = "BatteryChargeLimitService"
+        private const val NOTIFICATION_CHANNEL_ID = "Charge Limit State"
         /**
          * Returns whether the service is running right now
          *
-         * @return Whether service is running
+         * @return Whether the service is running
          */
         var isRunning = false
         private var ignoreAutoReset = false
 
         /**
-         * Ignore the automatic reset when service is shut down the next time
+         * Ignore the automatic reset when the service is shut down the next time
          */
         internal fun ignoreAutoReset() {
             ignoreAutoReset = true
