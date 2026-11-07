@@ -195,5 +195,14 @@
     "chargeOn": "0",
     "chargeOff": "1",
     "experimental": true
+  },
+  {
+    "file": "/sys/module/qpnp_adaptive_charge/parameters/upper_limit",
+    "label": "qpnp_adaptive_charge upper_limit",
+    "details": "Motorola Edge 50 Pro (Adaptive Charging off)",
+    "chargeOn": "-1",
+    "chargeOff": "80",
+    "experimental": true,
+    "order": 1
   }
 ]
