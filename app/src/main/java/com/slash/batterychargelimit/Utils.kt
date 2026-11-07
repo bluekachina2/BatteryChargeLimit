@@ -88,15 +88,15 @@ object Utils {
             // Set upper first (the driver validates lower against upper), then
             // lower to enable the driver's hysteresis/recharge threshold.
             arrayOf(
-                "echo \\"$limit\\" > $MOTOROLA_UPPER_LIMIT_FILE",
-                "echo \\"$recharge\\" > $MOTOROLA_LOWER_LIMIT_FILE"
+                "echo \"$limit\" > $MOTOROLA_UPPER_LIMIT_FILE",
+                "echo \"$recharge\" > $MOTOROLA_LOWER_LIMIT_FILE"
             )
         } else {
             // Clear lower first, then upper: the driver's upper setter otherwise
             // forces 100 when a non-default lower threshold is still configured.
             arrayOf(
-                "echo \\"-1\\" > $MOTOROLA_LOWER_LIMIT_FILE",
-                "echo \\"-1\\" > $MOTOROLA_UPPER_LIMIT_FILE"
+                "echo \"-1\" > $MOTOROLA_LOWER_LIMIT_FILE",
+                "echo \"-1\" > $MOTOROLA_UPPER_LIMIT_FILE"
             )
         }
         val newState = if (isMotorolaAdaptiveCharge) null else if (chargeMode == CHARGE_ON) {
@@ -112,11 +112,11 @@ object Utils {
         if (isMotorolaAdaptiveCharge) {
             switchCommands = motorolaLimitCommands
         } else if (cfInitialized) {
-            switchCommands = arrayOf("echo \\"$newState\\" > $file")
+            switchCommands = arrayOf("echo \"$newState\" > $file")
         } else {
             cfInitialized = true
             switchCommands = arrayOf("mount -o rw,remount $file", "chmod u+w $file",
-                    "echo \\"$newState\\" > $file")
+                    "echo \"$newState\" > $file")
         }
 
         if (alwaysWrite) {
