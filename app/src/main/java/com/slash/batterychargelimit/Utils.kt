@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.os.BatteryManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.preference.PreferenceManager
@@ -32,9 +33,11 @@ import java.io.InputStreamReader
 import java.nio.charset.Charset
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 object Utils {
     private val TAG = Utils::class.java.simpleName
+    private val serviceStartPending = AtomicBoolean(false)
     const val CHARGE_ON = 0
     const val CHARGE_OFF = 1
 
@@ -232,20 +235,48 @@ object Utils {
     }
 
     fun startServiceIfLimitEnabled(context: Context) {
-        if (getSettings(context).getBoolean(CHARGE_LIMIT_ENABLED, false)) {
-            if (getPrefs(context).getBoolean(PrefsFragment.KEY_DISABLE_AUTO_RECHARGE, false)) {
-                changeState(context, CHARGE_ON)
-            }
-            Handler().postDelayed({
-                if (isPhonePluggedIn(context)) {
-                    context.startService(Intent(context, ForegroundService::class.java))
-                    // display service enabled Toast message if not disabled in settings
-                    if (!getPrefs(context).getBoolean("hide_toast_on_service_changes", false)) {
-                        Toast.makeText(context, R.string.service_enabled, Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }, CHARGING_CHANGE_TOLERANCE_MS)
+        val appContext = context.applicationContext
+        val enabled = getSettings(appContext).getBoolean(CHARGE_LIMIT_ENABLED, false)
+        Log.i(TAG, "Checking charge-limit service start; enabled=$enabled")
+        if (!enabled) return
+
+        // Preserve the existing auto-recharge preference behavior.
+        if (getPrefs(appContext).getBoolean(PrefsFragment.KEY_DISABLE_AUTO_RECHARGE, false)) {
+            changeState(appContext, CHARGE_ON)
         }
+
+        val pluggedIn = try {
+            isPhonePluggedIn(appContext)
+        } catch (e: Exception) {
+            Log.e(TAG, "Unable to determine whether the device is plugged in", e)
+            false
+        }
+        Log.i(TAG, "Charge-limit service start; pluggedIn=$pluggedIn, running=${ForegroundService.isRunning}")
+
+        if (!pluggedIn || ForegroundService.isRunning || !serviceStartPending.compareAndSet(false, true)) return
+
+        try {
+            val serviceIntent = Intent(appContext, ForegroundService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                appContext.startForegroundService(serviceIntent)
+            } else {
+                appContext.startService(serviceIntent)
+            }
+            if (!getPrefs(appContext).getBoolean("hide_toast_on_service_changes", false)) {
+                Toast.makeText(appContext, R.string.service_enabled, Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            serviceStartPending.set(false)
+            Log.e(TAG, "Unable to start charge-limit foreground service", e)
+        }
+    }
+
+    internal fun onForegroundServiceCreated() {
+        serviceStartPending.set(false)
+    }
+
+    internal fun onForegroundServiceDestroyed() {
+        serviceStartPending.set(false)
     }
 
     fun getPrefs(context: Context): SharedPreferences {
