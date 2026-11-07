@@ -195,12 +195,5 @@
     "chargeOn": "0",
     "chargeOff": "1",
     "experimental": true
-  },
-  {
-    "file": "/sys/module/qpnp_adaptive_charge/parameters/charging_enabled",
-    "label": "qpnp_adaptive_charge",
-    "details": "Motorola Edge 50 Pro (tested: stops charging within ~12 s; turn off Moto adaptive charging)",
-    "chargeOn": "1",
-    "chargeOff": "0"
   }
 ]
