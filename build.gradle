@@ -18,6 +18,8 @@ buildscript {
 allprojects {
     repositories {
         google()
+        // libsuperuser is published in the SciJava public Maven repository.
+        maven { url 'https://maven.scijava.org/content/repositories/public/' }
         jcenter()
     }
 }
