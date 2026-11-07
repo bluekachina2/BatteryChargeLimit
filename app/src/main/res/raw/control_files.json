@@ -195,5 +195,13 @@
     "chargeOn": "0",
     "chargeOff": "1",
     "experimental": true
+  },
+  {
+    "file": "/sys/module/qpnp_adaptive_charge/parameters/charging_enabled",
+    "label": "qpnp_adaptive_charge",
+    "details": "Motorola Edge 50 Pro (reported working; disable Moto Adaptive Charging)",
+    "chargeOn": "1",
+    "chargeOff": "0",
+    "experimental": true
   }
 ]
