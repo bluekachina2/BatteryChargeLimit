@@ -180,9 +180,11 @@ class MainActivity : AppCompatActivity() {
         if (!prefs.getBoolean(getString(R.string.previously_started), false)) {
             // whitelist App for Doze Mode
             Utils.suShell.addCommand("dumpsys deviceidle whitelist +com.slash.batterychargelimit",
-                    0) { _, _, _ ->
-                prefs.edit().putBoolean(getString(R.string.previously_started), true).apply()
-            }
+                    0, object : Shell.OnCommandResultListener {
+                override fun onCommandResult(commandCode: Int, exitCode: Int, output: List<String>) {
+                    prefs.edit().putBoolean(getString(R.string.previously_started), true).apply()
+                }
+            })
         }
     }
 
