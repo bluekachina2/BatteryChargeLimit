@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.slash.batterychargelimit.Constants
 import com.slash.batterychargelimit.Utils
+import android.util.Log
 
 /**
  * Created by Michael on 20.04.2017.
@@ -13,8 +14,14 @@ import com.slash.batterychargelimit.Utils
  * Checks whether power supply is attached and starts the foreground service if necessary.
  */
 class BootReceiver : BroadcastReceiver() {
+    companion object {
+        private const val TAG = "BatteryChargeLimitBootReceiver"
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         if (Intent.ACTION_BOOT_COMPLETED == intent.action) {
+            Log.i(TAG, "BOOT_COMPLETED received")
+            Log.i(TAG, "Charge limit enabled=${Utils.getSettings(context).getBoolean(Constants.CHARGE_LIMIT_ENABLED, false)}")
             Utils.setVoltageThreshold(null, true, context, null)
             Utils.startServiceIfLimitEnabled(context)
             Utils.suShell.addCommand("cat ${Utils.getVoltageFile()}", 0) { _, _, output ->
