@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.media.RingtoneManager
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.slash.batterychargelimit.Constants.INTENT_DISABLE_ACTION
@@ -44,6 +45,8 @@ class ForegroundService : Service() {
 
     override fun onCreate() {
         isRunning = true
+        Utils.onForegroundServiceCreated()
+        Log.i(TAG, "Foreground service created; entering foreground state")
 
         notifyID = 1
         settings.edit().putBoolean(NOTIFICATION_LIVE, true).apply()
@@ -65,7 +68,7 @@ class ForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         ignoreAutoReset = false
-        return super.onStartCommand(intent, flags, startId)
+        return START_STICKY
     }
 
     fun setNotificationActionText(actionText: String) {
@@ -126,6 +129,8 @@ class ForegroundService : Service() {
         batteryReceiver = null
 
         isRunning = false
+        Utils.onForegroundServiceDestroyed()
+        Log.i(TAG, "Foreground service destroyed")
     }
 
     override fun onBind(intent: Intent): IBinder? {
@@ -133,6 +138,7 @@ class ForegroundService : Service() {
     }
 
     companion object {
+        private const val TAG = "BatteryChargeLimitService"
         /**
          * Returns whether the service is running right now
          *
