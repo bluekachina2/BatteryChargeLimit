@@ -40,6 +40,7 @@ object Utils {
     private val serviceStartPending = AtomicBoolean(false)
     const val CHARGE_ON = 0
     const val CHARGE_OFF = 1
+    private const val MOTOROLA_UPPER_LIMIT_FILE = "/sys/module/qpnp_adaptive_charge/parameters/upper_limit"
 
     // remember pending state change
     private var changePending: Long = 0
@@ -78,19 +79,30 @@ object Utils {
         val alwaysWrite = preferences.getBoolean(PrefsFragment.KEY_ALWAYS_WRITE_CF, false)
 
         val file = getCtrlFileData(context)
-        val newState = if (chargeMode == CHARGE_ON) {
+        val isMotorolaAdaptiveCharge = file == MOTOROLA_UPPER_LIMIT_FILE
+        // Motorola's driver uses -1 to disable its limit and a percentage as
+        // the automatic upper threshold. Keep lower_limit=-1 (automatic mode).
+        val newState = if (isMotorolaAdaptiveCharge) {
+            if (chargeMode == CHARGE_ON) {
+                "-1"
+            } else {
+                getSettings(context).getInt(LIMIT, Constants.DEFAULT_LIMIT_PC).toString()
+            }
+        } else if (chargeMode == CHARGE_ON) {
             getCtrlEnabledData(context)
         } else {
             getCtrlDisabledData(context)
         }
 
+        // Kernel module parameters are not mount points; root can write them
+        // directly without remounting or changing permissions.
         val switchCommands: Array<String>
-        if (cfInitialized) {
-            switchCommands = arrayOf("echo \"$newState\" > $file")
+        if (isMotorolaAdaptiveCharge || cfInitialized) {
+            switchCommands = arrayOf("echo \\"$newState\\" > $file")
         } else {
             cfInitialized = true
             switchCommands = arrayOf("mount -o rw,remount $file", "chmod u+w $file",
-                    "echo \"$newState\" > $file")
+                    "echo \\"$newState\\" > $file")
         }
 
         if (alwaysWrite) {
