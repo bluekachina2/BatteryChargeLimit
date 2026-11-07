@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.slash.batterychargelimit.Constants
 import com.slash.batterychargelimit.Utils
+import eu.chainfire.libsuperuser.Shell
 import android.util.Log
 
 /**
@@ -24,11 +25,13 @@ class BootReceiver : BroadcastReceiver() {
             Log.i(TAG, "Charge limit enabled=${Utils.getSettings(context).getBoolean(Constants.CHARGE_LIMIT_ENABLED, false)}")
             Utils.setVoltageThreshold(null, true, context, null)
             Utils.startServiceIfLimitEnabled(context)
-            Utils.suShell.addCommand("cat ${Utils.getVoltageFile()}", 0) { _, _, output ->
-                if (output.size != 0 ) {
-                    Utils.getSettings(context).edit().putString(Constants.DEFAULT_VOLTAGE_LIMIT, output[0]).apply()
+            Utils.suShell.addCommand("cat ${Utils.getVoltageFile()}", 0, object : Shell.OnCommandResultListener {
+                override fun onCommandResult(commandCode: Int, exitCode: Int, output: List<String>) {
+                    if (output.size != 0 ) {
+                        Utils.getSettings(context).edit().putString(Constants.DEFAULT_VOLTAGE_LIMIT, output[0]).apply()
+                    }
                 }
-            }
+            })
         }
     }
 }
