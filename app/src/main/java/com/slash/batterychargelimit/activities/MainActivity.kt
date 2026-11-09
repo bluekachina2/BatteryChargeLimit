@@ -244,6 +244,10 @@ class MainActivity : AppCompatActivity() {
         limitByVoltageSwitch.setOnCheckedChangeListener(switchListener)
         maxPicker.setOnValueChangedListener { _, _, max ->
             Utils.setLimit(max, settings)
+            // Apply the new Motorola sysfs thresholds immediately. Do not rely
+            // only on BatteryReceiver's preference listener: it may not be
+            // running (or may be between state transitions) when the value changes.
+            Utils.reapplyMotorolaChargeState(this@MainActivity)
             maxText.text = getString(R.string.limit, max)
             val min = settings.getInt(MIN, max - 2)
             minPicker.maxValue = max
@@ -257,6 +261,8 @@ class MainActivity : AppCompatActivity() {
 
         minPicker.setOnValueChangedListener { _, _, min ->
             settings.edit().putInt(MIN, min).apply()
+            // The recharge threshold is also a live driver setting.
+            Utils.reapplyMotorolaChargeState(this@MainActivity)
             updateMinText(min)
             setStatusCTRLFileData()
         }
