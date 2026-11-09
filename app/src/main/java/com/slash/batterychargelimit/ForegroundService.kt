@@ -55,6 +55,17 @@ class ForegroundService : Service() {
         }
     }
 
+    // The kernel module may reset its parameters after startup. Check periodically
+    // while the foreground service is active, without rewriting matching values.
+    private val motorolaVerifyHandler = android.os.Handler()
+    private val motorolaVerifyRunnable = object : Runnable {
+        override fun run() {
+            if (!isRunning) return
+            Utils.verifyMotorolaAdaptiveChargeState(this@ForegroundService)
+            motorolaVerifyHandler.postDelayed(this, MOTOROLA_VERIFY_INTERVAL_MS)
+        }
+    }
+
     /**
      * Enables the automatic reset on service shutdown
      */
@@ -108,6 +119,7 @@ class ForegroundService : Service() {
         // Also apply immediately; delayed retries cover late driver initialization.
         Utils.reapplyMotorolaChargeState(this)
         startupReapplyHandler.postDelayed(startupReapplyRunnable, startupReapplyDelays[startupReapplyAttempt++])
+        motorolaVerifyHandler.postDelayed(motorolaVerifyRunnable, MOTOROLA_VERIFY_INTERVAL_MS)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -159,6 +171,7 @@ class ForegroundService : Service() {
 
     override fun onDestroy() {
         startupReapplyHandler.removeCallbacks(startupReapplyRunnable)
+        motorolaVerifyHandler.removeCallbacks(motorolaVerifyRunnable)
         if (autoResetActive && !ignoreAutoReset && prefs.getBoolean(PrefsFragment.KEY_AUTO_RESET_STATS, false)) {
             Utils.resetBatteryStats(this)
         }
@@ -185,6 +198,7 @@ class ForegroundService : Service() {
     companion object {
         private const val TAG = "BatteryChargeLimitService"
         private const val NOTIFICATION_CHANNEL_ID = "Charge Limit State"
+        private const val MOTOROLA_VERIFY_INTERVAL_MS = 30_000L
         /**
          * Returns whether the service is running right now
          *
