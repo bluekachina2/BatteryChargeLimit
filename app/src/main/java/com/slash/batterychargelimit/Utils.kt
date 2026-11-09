@@ -71,8 +71,39 @@ object Utils {
 
     var suShell: Shell.Interactive = Shell.Builder().setWantSTDERR(false).useSU().open()
 
+    @Synchronized
     fun refreshSu() {
         suShell = Shell.Builder().setWantSTDERR(false).useSU().open()
+    }
+
+    /**
+     * Run a Motorola sysfs command through the persistent root shell. A shell
+     * created during early boot can become unusable; recreate it and retry once
+     * when the command fails or a required read result is missing.
+     */
+    private fun runMotorolaCommands(
+            commands: Array<String>,
+            description: String,
+            minOutputLines: Int = 0,
+            retry: Boolean = true,
+            onResult: (Int, List<String>) -> Unit = { _, _ -> }
+    ) {
+        val shell = suShell
+        shell.addCommand(commands, 0, object : Shell.OnCommandResultListener {
+            override fun onCommandResult(commandCode: Int, exitCode: Int, output: List<String>) {
+                val failed = exitCode != 0 || output.size < minOutputLines
+                if (failed && retry) {
+                    Log.w(TAG, "Motorola root-shell command failed ($description, exit=$exitCode); reopening root shell and retrying")
+                    refreshSu()
+                    runMotorolaCommands(commands, description, minOutputLines, false, onResult)
+                } else {
+                    if (failed) {
+                        Log.e(TAG, "Motorola root-shell command failed after retry ($description, exit=$exitCode, outputLines=" + output.size + ")")
+                    }
+                    onResult(exitCode, output)
+                }
+            }
+        })
     }
 
     val executor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -130,7 +161,7 @@ object Utils {
         // control-file state. Do not compare upper_limit against null.
         if (isMotorolaAdaptiveCharge) {
             setChangePending()
-            suShell.addCommand(switchCommands)
+            runMotorolaCommands(switchCommands, "adaptive-charge threshold write")
             return
         }
 
@@ -168,22 +199,23 @@ object Utils {
             expectedLower = "-1"
         }
 
-        suShell.addCommand("cat $MOTOROLA_UPPER_LIMIT_FILE; cat $MOTOROLA_LOWER_LIMIT_FILE",
-                0, object : Shell.OnCommandResultListener {
-            override fun onCommandResult(commandCode: Int, exitCode: Int, output: List<String>) {
-                if (exitCode != 0 || output.size < 2) {
-                    Log.w(TAG, "Unable to read Motorola adaptive-charge thresholds")
-                    return
-                }
-                val actualUpper = output[0].trim()
-                val actualLower = output[1].trim()
-                if (actualUpper != expectedUpper || actualLower != expectedLower) {
-                    Log.w(TAG, "Motorola thresholds differ from saved settings " +
-                            "(upper=$actualUpper/$expectedUpper, lower=$actualLower/$expectedLower); restoring")
-                    changeState(context, CHARGE_ON)
-                }
+        runMotorolaCommands(
+                arrayOf("cat $MOTOROLA_UPPER_LIMIT_FILE; cat $MOTOROLA_LOWER_LIMIT_FILE"),
+                "adaptive-charge threshold read",
+                minOutputLines = 2
+        ) { exitCode, output ->
+            if (exitCode != 0 || output.size < 2) {
+                Log.w(TAG, "Unable to read Motorola adaptive-charge thresholds after root-shell retry")
+                return@runMotorolaCommands
             }
-        })
+            val actualUpper = output[0].trim()
+            val actualLower = output[1].trim()
+            if (actualUpper != expectedUpper || actualLower != expectedLower) {
+                Log.w(TAG, "Motorola thresholds differ from saved settings " +
+                        "(upper=$actualUpper/$expectedUpper, lower=$actualLower/$expectedLower); restoring")
+                changeState(context, CHARGE_ON)
+            }
+        }
     }
 
     /**
@@ -195,16 +227,16 @@ object Utils {
         if (getCtrlFileData(context) == MOTOROLA_UPPER_LIMIT_FILE) {
             val value = if (disabled) "1" else "0"
             executor.submit {
-                suShell.addCommand("echo \"$value\" > $MOTOROLA_FORCE_CHARGER_SUSPEND_FILE", 0,
-                        object : Shell.OnCommandResultListener {
-                            override fun onCommandResult(commandCode: Int, exitCode: Int, output: List<String>) {
-                                if (exitCode != 0) {
-                                    Log.e(TAG, "Unable to set Motorola force_charger_suspend=$value")
-                                } else {
-                                    Log.i(TAG, "Motorola force_charger_suspend set to $value")
-                                }
-                            }
-                        })
+                runMotorolaCommands(
+                        arrayOf("echo \"$value\" > $MOTOROLA_FORCE_CHARGER_SUSPEND_FILE"),
+                        "force_charger_suspend=$value"
+                ) { exitCode, _ ->
+                    if (exitCode != 0) {
+                        Log.e(TAG, "Unable to set Motorola force_charger_suspend=$value after root-shell retry")
+                    } else {
+                        Log.i(TAG, "Motorola force_charger_suspend set to $value")
+                    }
+                }
             }
         } else {
             changeState(context, if (disabled) CHARGE_OFF else CHARGE_ON)
