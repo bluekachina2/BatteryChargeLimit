@@ -76,15 +76,11 @@ class BatteryReceiver(private val service: ForegroundService) : BroadcastReceive
      * @param newState the new state
      * @return whether the state has changed
      */
-    // Motorola's kernel driver enforces upper/lower thresholds itself. Rewriting
-    // those sysfs values in response to each battery broadcast can make Android
-    // briefly report CHARGING again and trigger the receiver's corrective cycle.
-    // Leave Motorola threshold control to the driver; retain legacy switching for
-    // other control-file implementations.
+    // Apply the Motorola upper threshold when the receiver changes charge state.
+    // The driver handles the stop at the configured percentage; CHARGE_ON clears
+    // the threshold again when the recharge point is reached.
     private fun applyChargeMode(chargeMode: Int) {
-        if (!Utils.isMotorolaAdaptiveCharge(service)) {
-            Utils.changeState(service, chargeMode)
-        }
+        Utils.changeState(service, chargeMode)
     }
 
     private fun switchState(newState: Int): Boolean {
