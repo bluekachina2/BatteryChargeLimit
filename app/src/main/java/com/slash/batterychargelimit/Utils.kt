@@ -71,9 +71,15 @@ object Utils {
 
     var suShell: Shell.Interactive = Shell.Builder().setWantSTDERR(false).useSU().open()
 
+    init {
+        Log.i(TAG, "Utils initialized; persistent root shell opened")
+    }
+
     @Synchronized
     fun refreshSu() {
+        Log.i(TAG, "Reopening persistent root shell")
         suShell = Shell.Builder().setWantSTDERR(false).useSU().open()
+        Log.i(TAG, "Persistent root shell reopened")
     }
 
     /**
@@ -89,21 +95,44 @@ object Utils {
             onResult: (Int, List<String>) -> Unit = { _, _ -> }
     ) {
         val shell = suShell
-        shell.addCommand(commands, 0, object : Shell.OnCommandResultListener {
-            override fun onCommandResult(commandCode: Int, exitCode: Int, output: List<String>) {
-                val failed = exitCode != 0 || output.size < minOutputLines
-                if (failed && retry) {
-                    Log.w(TAG, "Motorola root-shell command failed ($description, exit=$exitCode); reopening root shell and retrying")
+        Log.i(TAG, "Motorola root command queued ($description): " + commands.joinToString(" ; "))
+        try {
+            shell.addCommand(commands, 0, object : Shell.OnCommandResultListener {
+                override fun onCommandResult(commandCode: Int, exitCode: Int, output: List<String>) {
+                    val failed = exitCode != 0 || output.size < minOutputLines
+                    Log.i(TAG, "Motorola root command completed ($description, exit=$exitCode, outputLines=${output.size}): " +
+                            output.joinToString(" | "))
+                    if (failed && retry) {
+                        Log.w(TAG, "Motorola root-shell command failed ($description, exit=$exitCode); reopening root shell and retrying")
+                        try {
+                            refreshSu()
+                            runMotorolaCommands(commands, description, minOutputLines, false, onResult)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Unable to reopen root shell for retry ($description)", e)
+                            onResult(-1, emptyList())
+                        }
+                    } else {
+                        if (failed) {
+                            Log.e(TAG, "Motorola root-shell command failed after retry ($description, exit=$exitCode, outputLines=" + output.size + ")")
+                        }
+                        onResult(exitCode, output)
+                    }
+                }
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "Unable to queue Motorola root command ($description)", e)
+            if (retry) {
+                try {
                     refreshSu()
                     runMotorolaCommands(commands, description, minOutputLines, false, onResult)
-                } else {
-                    if (failed) {
-                        Log.e(TAG, "Motorola root-shell command failed after retry ($description, exit=$exitCode, outputLines=" + output.size + ")")
-                    }
-                    onResult(exitCode, output)
+                } catch (retryError: Exception) {
+                    Log.e(TAG, "Unable to queue Motorola root command after shell restart ($description)", retryError)
+                    onResult(-1, emptyList())
                 }
+            } else {
+                onResult(-1, emptyList())
             }
-        })
+        }
     }
 
     val executor: ExecutorService = Executors.newSingleThreadExecutor()
