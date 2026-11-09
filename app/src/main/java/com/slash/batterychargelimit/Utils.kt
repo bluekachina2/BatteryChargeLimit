@@ -123,11 +123,14 @@ object Utils {
         val motorolaLimitCommands = if (motorolaEnabled) {
             val limit = getSettings(context).getInt(LIMIT, Constants.DEFAULT_LIMIT_PC)
             val recharge = getSettings(context).getInt(MIN, (limit - 2).coerceAtLeast(0))
-            // Set upper first (the driver validates lower against upper), then
-            // lower to enable the driver's hysteresis/recharge threshold.
+            // Set lower first and upper last. On the Edge 50 Pro, writing
+            // lower_limit after an active upper-limit crossing clears the
+            // driver's stop-charging vote. Writing upper_limit last forces a
+            // final driver update with both thresholds installed, preserving
+            // the stop vote while the battery is above the upper threshold.
             arrayOf(
-                "echo \"$limit\" > $MOTOROLA_UPPER_LIMIT_FILE",
-                "echo \"$recharge\" > $MOTOROLA_LOWER_LIMIT_FILE"
+                "echo \"$recharge\" > $MOTOROLA_LOWER_LIMIT_FILE",
+                "echo \"$limit\" > $MOTOROLA_UPPER_LIMIT_FILE"
             )
         } else {
             // Clear lower first, then upper: the driver's upper setter otherwise
