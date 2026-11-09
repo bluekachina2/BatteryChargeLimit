@@ -39,6 +39,22 @@ class ForegroundService : Service() {
     private var autoResetActive = false
     private var batteryReceiver: BatteryReceiver? = null
 
+    // The Qualcomm adaptive-charge module can load after BOOT_COMPLETED and
+    // reset upper_limit/lower_limit. Retry while this plugged-in service lives.
+    private val startupReapplyHandler = android.os.Handler()
+    private var startupReapplyAttempt = 0
+    private val startupReapplyDelays = longArrayOf(1_000L, 3_000L, 7_000L, 15_000L)
+    private val startupReapplyRunnable = object : Runnable {
+        override fun run() {
+            if (!isRunning) return
+            Utils.reapplyMotorolaChargeState(this@ForegroundService)
+            if (startupReapplyAttempt < startupReapplyDelays.size) {
+                val delay = startupReapplyDelays[startupReapplyAttempt++]
+                startupReapplyHandler.postDelayed(this, delay)
+            }
+        }
+    }
+
     /**
      * Enables the automatic reset on service shutdown
      */
@@ -88,6 +104,10 @@ class ForegroundService : Service() {
 
         batteryReceiver = BatteryReceiver(this@ForegroundService)
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+
+        // Also apply immediately; delayed retries cover late driver initialization.
+        Utils.reapplyMotorolaChargeState(this)
+        startupReapplyHandler.postDelayed(startupReapplyRunnable, startupReapplyDelays[startupReapplyAttempt++])
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -138,6 +158,7 @@ class ForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        startupReapplyHandler.removeCallbacks(startupReapplyRunnable)
         if (autoResetActive && !ignoreAutoReset && prefs.getBoolean(PrefsFragment.KEY_AUTO_RESET_STATS, false)) {
             Utils.resetBatteryStats(this)
         }
