@@ -76,6 +76,17 @@ class BatteryReceiver(private val service: ForegroundService) : BroadcastReceive
      * @param newState the new state
      * @return whether the state has changed
      */
+    // Motorola's kernel driver enforces upper/lower thresholds itself. Rewriting
+    // those sysfs values in response to each battery broadcast can make Android
+    // briefly report CHARGING again and trigger the receiver's corrective cycle.
+    // Leave Motorola threshold control to the driver; retain legacy switching for
+    // other control-file implementations.
+    private fun applyChargeMode(chargeMode: Int) {
+        if (!Utils.isMotorolaAdaptiveCharge(service)) {
+            Utils.changeState(service, chargeMode)
+        }
+    }
+
     private fun switchState(newState: Int): Boolean {
         val oldState = lastState
         lastState = newState
@@ -118,7 +129,7 @@ class BatteryReceiver(private val service: ForegroundService) : BroadcastReceive
         if (!chargedToLimit && batteryLevel < limitPercentage) {
             if (switchState(CHARGE_FULL)) {
                 Log.d("Charging State", "CHARGE_FULL " + this.hashCode())
-                Utils.changeState(service, Utils.CHARGE_ON)
+                applyChargeMode(Utils.CHARGE_ON)
                 service.setNotificationTitle(service.getString(R.string.waiting_until_x, limitPercentage))
                 service.setNotificationIcon(NOTIF_CHARGE)
                 service.setNotificationActionText(service.getString(R.string.disable_temporarily))
@@ -135,7 +146,7 @@ class BatteryReceiver(private val service: ForegroundService) : BroadcastReceive
                 chargedToLimit = true
                 // active auto reset on service shutdown
                 service.enableAutoReset()
-                Utils.changeState(service, Utils.CHARGE_OFF)
+                applyChargeMode(Utils.CHARGE_OFF)
 
                 if (preferences.getBoolean(PrefsFragment.KEY_DISABLE_AUTO_RECHARGE, false)) {
                     Utils.stopService(service, false)
@@ -153,10 +164,10 @@ class BatteryReceiver(private val service: ForegroundService) : BroadcastReceive
                 Log.d("Charging State", "Fixing state w. CHARGE_ON/CHARGE_OFF " + this.hashCode()
                         + " (Delay: $backOffTime)")
                 // if the device did not stop charging, try to "cycle" the state to fix this
-                Utils.changeState(service, Utils.CHARGE_ON)
+                applyChargeMode(Utils.CHARGE_ON)
                 // schedule the charging stop command to be executed after CHARGING_CHANGE_TOLERANCE_MS
                 val service = this.service
-                handler.postDelayed({ Utils.changeState(service, Utils.CHARGE_OFF) }, backOffTime)
+                handler.postDelayed({ applyChargeMode(Utils.CHARGE_OFF) }, backOffTime)
             } else {
                 backOffTime = CHARGING_CHANGE_TOLERANCE_MS
             }
@@ -166,7 +177,7 @@ class BatteryReceiver(private val service: ForegroundService) : BroadcastReceive
                 service.setNotificationIcon(NOTIF_CHARGE)
                 service.setNotificationTitle(service.getString(R.string.waiting_until_x, limitPercentage))
                 service.setNotificationActionText(service.getString(R.string.disable_temporarily))
-                Utils.changeState(service, Utils.CHARGE_ON)
+                applyChargeMode(Utils.CHARGE_ON)
                 stopIfUnplugged()
             }
         }
