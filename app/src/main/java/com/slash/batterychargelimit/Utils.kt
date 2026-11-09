@@ -77,6 +77,11 @@ object Utils {
 
     val executor: ExecutorService = Executors.newSingleThreadExecutor()
 
+    /** True when the selected control is the Motorola Qualcomm adaptive-charge driver. */
+    fun isMotorolaAdaptiveCharge(context: Context): Boolean {
+        return getCtrlFileData(context) == MOTOROLA_UPPER_LIMIT_FILE
+    }
+
     fun changeState(context: Context, chargeMode: Int) {
         val preferences = getPrefs(context)
         val alwaysWrite = preferences.getBoolean(PrefsFragment.KEY_ALWAYS_WRITE_CF, false)
