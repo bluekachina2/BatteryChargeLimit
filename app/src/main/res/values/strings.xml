@@ -45,6 +45,8 @@
     <string name="waiting_description">Battery will stop charging once limit is reached</string>
     <string name="battery_info_C">U: %1$.3f V, T: %2$.1f &#8451;</string>
     <string name="battery_info_F">U: %1$.3f V, T: %2$.1f &#8457;</string>
+    <string name="battery_current">Current: %+d mA</string>
+    <string name="battery_current_unavailable">Current: unavailable</string>
 
     <string name="root_denied">App is denied ROOT access or device is not rooted!</string>
     <string name="stats_reset_success">Battery Stats reset successful</string>
