@@ -24,6 +24,7 @@ class BootReceiver : BroadcastReceiver() {
             Log.i(TAG, "BOOT_COMPLETED received")
             Log.i(TAG, "Charge limit enabled=${Utils.getSettings(context).getBoolean(Constants.CHARGE_LIMIT_ENABLED, false)}")
             Utils.setVoltageThreshold(null, true, context, null)
+            Utils.applyChargeNowState(context)
             Utils.startServiceIfLimitEnabled(context)
             Utils.suShell.addCommand("cat ${Utils.getVoltageFile()}", 0, object : Shell.OnCommandResultListener {
                 override fun onCommandResult(commandCode: Int, exitCode: Int, output: List<String>) {
