@@ -160,6 +160,21 @@ object Utils {
         }
     }
 
+    /**
+     * Reapply the saved Motorola adaptive-charge thresholds and immediate
+     * charge-suspend state. The driver may initialize after BOOT_COMPLETED and
+     * reset its module parameters, so the foreground service retries this.
+     *
+     * @return true when the selected control file is Motorola's adaptive driver.
+     */
+    fun reapplyMotorolaChargeState(context: Context): Boolean {
+        if (getCtrlFileData(context) != MOTOROLA_UPPER_LIMIT_FILE) return false
+        changeState(context, CHARGE_ON)
+        applyChargeNowState(context)
+        Log.i(TAG, "Reapplied saved Motorola adaptive-charge and immediate-stop settings")
+        return true
+    }
+
     /** Reapply the persisted immediate-stop switch after Android has booted. */
     fun applyChargeNowState(context: Context) {
         if (getCtrlFileData(context) == MOTOROLA_UPPER_LIMIT_FILE) {
