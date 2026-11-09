@@ -15,6 +15,7 @@ import android.widget.Toast
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.slash.batterychargelimit.Constants.CHARGE_LIMIT_ENABLED
+import com.slash.batterychargelimit.Constants.DISABLE_CHARGE_NOW
 import com.slash.batterychargelimit.Constants.CHARGE_OFF_KEY
 import com.slash.batterychargelimit.Constants.CHARGE_ON_KEY
 import com.slash.batterychargelimit.Constants.CHARGING_CHANGE_TOLERANCE_MS
@@ -42,6 +43,7 @@ object Utils {
     const val CHARGE_OFF = 1
     private const val MOTOROLA_UPPER_LIMIT_FILE = "/sys/module/qpnp_adaptive_charge/parameters/upper_limit"
     private const val MOTOROLA_LOWER_LIMIT_FILE = "/sys/module/qpnp_adaptive_charge/parameters/lower_limit"
+    private const val MOTOROLA_FORCE_CHARGER_SUSPEND_FILE = "/sys/devices/platform/soc/soc:qcom,pmic_glink/soc:qcom,pmic_glink:qcom,battery_charger/force_charger_suspend"
 
     // remember pending state change
     private var changePending: Long = 0
@@ -130,6 +132,38 @@ object Utils {
                     }
                 }
             })
+        }
+    }
+
+    /**
+     * Toggle the Motorola Qualcomm charger suspend control independently of
+     * the adaptive upper/lower charge thresholds. The value semantics (1=suspend,
+     * 0=normal) were verified on a Motorola Edge 50 Pro.
+     */
+    fun setChargeNow(context: Context, disabled: Boolean) {
+        if (getCtrlFileData(context) == MOTOROLA_UPPER_LIMIT_FILE) {
+            val value = if (disabled) "1" else "0"
+            executor.submit {
+                suShell.addCommand("echo \\"$value\\" > $MOTOROLA_FORCE_CHARGER_SUSPEND_FILE", 0,
+                        object : Shell.OnCommandResultListener {
+                            override fun onCommandResult(commandCode: Int, exitCode: Int, output: List<String>) {
+                                if (exitCode != 0) {
+                                    Log.e(TAG, "Unable to set Motorola force_charger_suspend=$value")
+                                } else {
+                                    Log.i(TAG, "Motorola force_charger_suspend set to $value")
+                                }
+                            }
+                        })
+            }
+        } else {
+            changeState(context, if (disabled) CHARGE_OFF else CHARGE_ON)
+        }
+    }
+
+    /** Reapply the persisted immediate-stop switch after Android has booted. */
+    fun applyChargeNowState(context: Context) {
+        if (getCtrlFileData(context) == MOTOROLA_UPPER_LIMIT_FILE) {
+            setChargeNow(context, getSettings(context).getBoolean(DISABLE_CHARGE_NOW, false))
         }
     }
 
