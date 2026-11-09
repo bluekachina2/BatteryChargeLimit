@@ -148,40 +148,25 @@ object Utils {
 
         val file = getCtrlFileData(context)
         val isMotorolaAdaptiveCharge = file == MOTOROLA_UPPER_LIMIT_FILE
-        val motorolaEnabled = getSettings(context).getBoolean(CHARGE_LIMIT_ENABLED, false)
-        val motorolaLimitCommands = if (motorolaEnabled) {
-            val limit = getSettings(context).getInt(LIMIT, Constants.DEFAULT_LIMIT_PC)
-            val recharge = getSettings(context).getInt(MIN, (limit - 2).coerceAtLeast(0))
-            // Set lower first and upper last. On the Edge 50 Pro, writing
-            // lower_limit after an active upper-limit crossing clears the
-            // driver's stop-charging vote. Writing upper_limit last forces a
-            // final driver update with both thresholds installed, preserving
-            // the stop vote while the battery is above the upper threshold.
-            arrayOf(
-                "echo \"$recharge\" > $MOTOROLA_LOWER_LIMIT_FILE",
-                "echo \"$limit\" > $MOTOROLA_UPPER_LIMIT_FILE"
-            )
-        } else {
-            // Clear lower first, then upper: the driver's upper setter otherwise
-            // forces 100 when a non-default lower threshold is still configured.
-            arrayOf(
-                "echo \"-1\" > $MOTOROLA_LOWER_LIMIT_FILE",
-                "echo \"-1\" > $MOTOROLA_UPPER_LIMIT_FILE"
-            )
-        }
-        val newState = if (isMotorolaAdaptiveCharge) null else if (chargeMode == CHARGE_ON) {
+        // The Edge 50 Pro reliably enforces the upper threshold on its own.
+        // Keep lower_limit at -1: writing it can clear the driver's blocking
+        // vote. CHARGE_ON clears the upper limit; CHARGE_OFF applies the limit.
+        val newState = if (isMotorolaAdaptiveCharge) {
+            if (chargeMode == CHARGE_ON) {
+                "-1"
+            } else {
+                getSettings(context).getInt(LIMIT, Constants.DEFAULT_LIMIT_PC).toString()
+            }
+        } else if (chargeMode == CHARGE_ON) {
             getCtrlEnabledData(context)
         } else {
             getCtrlDisabledData(context)
         }
 
-        // Motorola module parameters are writable sysfs attributes, not mount
-        // points. Apply both thresholds together; CHARGE_ON/OFF events must not
-        // toggle this driver's independent threshold mechanism on and off.
+        // Motorola's upper_limit is a writable sysfs parameter, not a mount
+        // point. Apply the single upper threshold used by the working driver path.
         val switchCommands: Array<String>
-        if (isMotorolaAdaptiveCharge) {
-            switchCommands = motorolaLimitCommands
-        } else if (cfInitialized) {
+        if (isMotorolaAdaptiveCharge || cfInitialized) {
             switchCommands = arrayOf("echo \"$newState\" > $file")
         } else {
             cfInitialized = true
@@ -189,11 +174,9 @@ object Utils {
                     "echo \"$newState\" > $file")
         }
 
-        // Motorola uses two independent sysfs parameters rather than one
-        // control-file state. Do not compare upper_limit against null.
         if (isMotorolaAdaptiveCharge) {
             setChangePending()
-            runMotorolaCommands(switchCommands, "adaptive-charge threshold write")
+            runMotorolaCommands(switchCommands, "adaptive-charge upper-limit write")
             return
         }
 
@@ -219,33 +202,26 @@ object Utils {
         if (!isMotorolaAdaptiveCharge(context)) return
 
         val settings = getSettings(context)
-        val enabled = settings.getBoolean(CHARGE_LIMIT_ENABLED, false)
-        val expectedUpper: String
-        val expectedLower: String
-        if (enabled) {
-            val limit = settings.getInt(LIMIT, Constants.DEFAULT_LIMIT_PC)
-            expectedUpper = limit.toString()
-            expectedLower = settings.getInt(MIN, (limit - 2).coerceAtLeast(0)).toString()
-        } else {
-            expectedUpper = "-1"
-            expectedLower = "-1"
-        }
+        if (!settings.getBoolean(CHARGE_LIMIT_ENABLED, false)) return
+        val limit = settings.getInt(LIMIT, Constants.DEFAULT_LIMIT_PC)
+        val batteryIntent = context.applicationContext.registerReceiver(
+                null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        if (batteryIntent == null || getBatteryLevel(batteryIntent) < limit) return
 
         runMotorolaCommands(
-                arrayOf("cat $MOTOROLA_UPPER_LIMIT_FILE; cat $MOTOROLA_LOWER_LIMIT_FILE"),
-                "adaptive-charge threshold read",
-                minOutputLines = 2
+                arrayOf("cat $MOTOROLA_UPPER_LIMIT_FILE"),
+                "adaptive-charge upper-limit read",
+                minOutputLines = 1
         ) { exitCode, output ->
-            if (exitCode != 0 || output.size < 2) {
-                Log.w(TAG, "Unable to read Motorola adaptive-charge thresholds after root-shell retry")
+            if (exitCode != 0 || output.isEmpty()) {
+                Log.w(TAG, "Unable to read Motorola upper threshold after root-shell retry")
                 return@runMotorolaCommands
             }
             val actualUpper = output[0].trim()
-            val actualLower = output[1].trim()
-            if (actualUpper != expectedUpper || actualLower != expectedLower) {
-                Log.w(TAG, "Motorola thresholds differ from saved settings " +
-                        "(upper=$actualUpper/$expectedUpper, lower=$actualLower/$expectedLower); restoring")
-                changeState(context, CHARGE_ON)
+            if (actualUpper != limit.toString()) {
+                Log.w(TAG, "Motorola upper threshold differs from saved limit " +
+                        "(upper=$actualUpper/$limit); restoring upper threshold")
+                changeState(context, CHARGE_OFF)
             }
         }
     }
@@ -284,9 +260,14 @@ object Utils {
      */
     fun reapplyMotorolaChargeState(context: Context): Boolean {
         if (getCtrlFileData(context) != MOTOROLA_UPPER_LIMIT_FILE) return false
-        changeState(context, CHARGE_ON)
+        val settings = getSettings(context)
+        val limit = settings.getInt(LIMIT, Constants.DEFAULT_LIMIT_PC)
+        val batteryIntent = context.applicationContext.registerReceiver(
+                null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val batteryLevel = if (batteryIntent != null) getBatteryLevel(batteryIntent) else -1
+        changeState(context, if (batteryLevel >= limit) CHARGE_OFF else CHARGE_ON)
         applyChargeNowState(context)
-        Log.i(TAG, "Reapplied saved Motorola adaptive-charge and immediate-stop settings")
+        Log.i(TAG, "Reapplied saved Motorola upper threshold and immediate-stop settings")
         return true
     }
 
