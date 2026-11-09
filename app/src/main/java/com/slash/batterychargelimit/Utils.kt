@@ -144,7 +144,7 @@ object Utils {
         if (getCtrlFileData(context) == MOTOROLA_UPPER_LIMIT_FILE) {
             val value = if (disabled) "1" else "0"
             executor.submit {
-                suShell.addCommand("echo \\"$value\\" > $MOTOROLA_FORCE_CHARGER_SUSPEND_FILE", 0,
+                suShell.addCommand("echo \"$value\" > $MOTOROLA_FORCE_CHARGER_SUSPEND_FILE", 0,
                         object : Shell.OnCommandResultListener {
                             override fun onCommandResult(commandCode: Int, exitCode: Int, output: List<String>) {
                                 if (exitCode != 0) {
