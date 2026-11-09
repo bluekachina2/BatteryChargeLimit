@@ -55,7 +55,7 @@ tools:showIn="@layout/activity_main">
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!--FUTURE add live current-->
+        <!-- Live battery current is appended to the existing battery information line. -->
         <com.google.android.material.card.MaterialCardView
             style="@style/CustomMaterialCard">
 
