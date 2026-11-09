@@ -126,6 +126,14 @@ object Utils {
                     "echo \"$newState\" > $file")
         }
 
+        // Motorola uses two independent sysfs parameters rather than one
+        // control-file state. Do not compare upper_limit against null.
+        if (isMotorolaAdaptiveCharge) {
+            setChangePending()
+            suShell.addCommand(switchCommands)
+            return
+        }
+
         if (alwaysWrite) {
             suShell.addCommand(switchCommands)
         } else {
@@ -138,6 +146,44 @@ object Utils {
                 }
             })
         }
+    }
+
+    /**
+     * Verify that the kernel driver still has the values saved by the app.
+     * Restore them only when a mismatch is found (for example after a driver reset).
+     */
+    fun verifyMotorolaAdaptiveChargeState(context: Context) {
+        if (!isMotorolaAdaptiveCharge(context)) return
+
+        val settings = getSettings(context)
+        val enabled = settings.getBoolean(CHARGE_LIMIT_ENABLED, false)
+        val expectedUpper: String
+        val expectedLower: String
+        if (enabled) {
+            val limit = settings.getInt(LIMIT, Constants.DEFAULT_LIMIT_PC)
+            expectedUpper = limit.toString()
+            expectedLower = settings.getInt(MIN, (limit - 2).coerceAtLeast(0)).toString()
+        } else {
+            expectedUpper = "-1"
+            expectedLower = "-1"
+        }
+
+        suShell.addCommand("cat $MOTOROLA_UPPER_LIMIT_FILE; cat $MOTOROLA_LOWER_LIMIT_FILE",
+                0, object : Shell.OnCommandResultListener {
+            override fun onCommandResult(commandCode: Int, exitCode: Int, output: List<String>) {
+                if (exitCode != 0 || output.size < 2) {
+                    Log.w(TAG, "Unable to read Motorola adaptive-charge thresholds")
+                    return
+                }
+                val actualUpper = output[0].trim()
+                val actualLower = output[1].trim()
+                if (actualUpper != expectedUpper || actualLower != expectedLower) {
+                    Log.w(TAG, "Motorola thresholds differ from saved settings " +
+                            "(upper=$actualUpper/$expectedUpper, lower=$actualLower/$expectedLower); restoring")
+                    changeState(context, CHARGE_ON)
+                }
+            }
+        })
     }
 
     /**
