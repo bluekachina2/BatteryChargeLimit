@@ -295,11 +295,11 @@ class MainActivity : AppCompatActivity() {
                 }
                 R.id.disable_charge_switch -> {
                     if (isChecked) {
-                        Utils.changeState(this@MainActivity, Utils.CHARGE_OFF)
+                        Utils.setChargeNow(this@MainActivity, true)
                         settings.edit().putBoolean(DISABLE_CHARGE_NOW, true).apply()
                         disableSwitches(listOf(enableSwitch, limitByVoltageSwitch))
                     } else {
-                        Utils.changeState(this@MainActivity, Utils.CHARGE_ON)
+                        Utils.setChargeNow(this@MainActivity, false)
                         settings.edit().putBoolean(DISABLE_CHARGE_NOW, false).apply()
                         enableSwitches(listOf(enableSwitch, limitByVoltageSwitch))
                     }
