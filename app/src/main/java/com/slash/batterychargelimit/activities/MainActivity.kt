@@ -227,7 +227,7 @@ class MainActivity : AppCompatActivity() {
         val isChargeLimitEnabled = settings.getBoolean(CHARGE_LIMIT_ENABLED, false)
 
         if (isChargeLimitEnabled && Utils.isPhonePluggedIn(this)) {
-            this.startService(Intent(this, ForegroundService::class.java))
+            Utils.startServiceIfLimitEnabled(this)
         }
 
         val resetBatteryStatsButton = findViewById<Button>(R.id.reset_battery_stats)
