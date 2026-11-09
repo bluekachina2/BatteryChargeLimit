@@ -3,6 +3,7 @@ package com.slash.batterychargelimit.activities
 import android.content.*
 import android.content.pm.PackageManager
 import android.os.BatteryManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Message
@@ -395,8 +396,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateBatteryInfo(intent: Intent) {
-        batteryInfo.text = String.format(" (%s)", Utils.getBatteryInfo(this, intent,
-                prefs.getBoolean(PrefsFragment.KEY_TEMP_FAHRENHEIT, false)))
+        val batteryInfoText = Utils.getBatteryInfo(this, intent,
+                prefs.getBoolean(PrefsFragment.KEY_TEMP_FAHRENHEIT, false))
+        val currentText = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+            val currentMicroAmps = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+            if (currentMicroAmps != Int.MIN_VALUE) {
+                // Android reports battery current in microamps: positive while charging,
+                // negative while discharging. Convert to mA without discarding the sign.
+                getString(R.string.battery_current, currentMicroAmps / 1000)
+            } else {
+                getString(R.string.battery_current_unavailable)
+            }
+        } else {
+            getString(R.string.battery_current_unavailable)
+        }
+        batteryInfo.text = String.format(" (%s), %s", batteryInfoText, currentText)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
